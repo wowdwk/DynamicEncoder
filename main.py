@@ -6,7 +6,6 @@ from Transmission import *
 from PositionEst import Make_Data
 from InPainting import InPaint_train
 
-
 if __name__ == '__main__':
 
     ####################################### Selection Process at Tx #######################################
@@ -29,6 +28,9 @@ if __name__ == '__main__':
 
     ####################################### Transmission process with Rayleigh channel #######################################
 
+    if not os.path.exists('trained_Transmission'):
+        os.makedirs('trained_Transmission')
+
     for dim_i in range(len(params['DIM'])):
 
         # 수정된 부분: DIM 값만으로 파일이 있는지 확인
@@ -49,6 +51,11 @@ if __name__ == '__main__':
             Make_Data(params['DIM'][dim_i])
 
     ####################################### Inpainting Process at Rx #######################################
+
+    if not os.path.exists('inpaint_model'):
+        os.makedirs('inpaint_model')
+
+    for dim_i in range(len(params['DIM'])):
 
         inpaint_model_dir = f"inpaint_model/InPaint(DIM={params['DIM'][dim_i]})"
         if not any(fname.startswith(f"InPaint(DIM={params['DIM'][dim_i]}_SNR=") for fname in os.listdir('inpaint_model')):

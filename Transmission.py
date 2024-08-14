@@ -26,7 +26,6 @@ class Encoder(nn.Module):
         self.flatten = nn.Flatten()
         self.linear = nn.Linear(2048, self.latent_dim)
 
-
         self.essen = nn.Conv2d(32, 32, kernel_size=5, stride=2, padding=1)
 
 
@@ -203,12 +202,6 @@ class Autoencoder(nn.Module):
 
         return decoded
 def Transmission_train(trainloader, testloader, latent_dim):
-    performance_file = 'Performance.txt'
-
-    # Performance.txt 파일 초기화
-    if not os.path.exists(performance_file):
-        with open(performance_file, 'w') as f:
-            f.write('')
 
     for snr_i in range(len(params['SNR'])):
 
@@ -230,7 +223,10 @@ def Transmission_train(trainloader, testloader, latent_dim):
         for epoch in range(params['EP']):
 
             # ========================================== Train ==========================================
-            train_loss = 0.0
+            train_loss_0 = 0.0
+            train_loss_23 = 0.0
+            train_loss_43 = 0.0
+            train_loss_60 = 0.0
 
             model.train()
             timetemp = time.time()
@@ -242,29 +238,46 @@ def Transmission_train(trainloader, testloader, latent_dim):
                 reshaped_43 = data['reshaped_43']
                 reshaped_60 = data['reshaped_60']
 
-                random_choice = random.choice([1, 2, 3, 4])
-
-                if random_choice == 1:
-                    inputs = original_images.to(device)
-                elif random_choice == 2:
-                    inputs = reshaped_23.to(device)
-                elif random_choice == 3:
-                    inputs = reshaped_43.to(device)
-                elif random_choice == 4:
-                    inputs = reshaped_60.to(device)
+                inputs_0 = original_images.to(device)
+                inputs_23 = reshaped_23.to(device)
+                inputs_43 = reshaped_43.to(device)
+                inputs_60 = reshaped_60.to(device)
 
                 optimizer.zero_grad()
-                outputs = model(inputs, SNRdB=params['SNR'][snr_i], channel=params['channel'])
-                loss = criterion(inputs, outputs)
+                outputs_0 = model(inputs_0, SNRdB=params['SNR'][snr_i], channel=params['channel'])
+                outputs_23 = model(inputs_23, SNRdB=params['SNR'][snr_i], channel=params['channel'])
+                outputs_43 = model(inputs_43, SNRdB=params['SNR'][snr_i], channel=params['channel'])
+                outputs_60 = model(inputs_60, SNRdB=params['SNR'][snr_i], channel=params['channel'])
+
+                loss_0 = criterion(inputs_0, outputs_0)
+                loss_23 = criterion(inputs_23, outputs_23)
+                loss_43 = criterion(inputs_43, outputs_43)
+                loss_60 = criterion(inputs_60, outputs_60)
+
+                loss = loss_0 + 0.9 * loss_23 + 0.6 * loss_43 + 0.4 * loss_60
+
                 loss.backward()
                 optimizer.step()
-                train_loss += loss.item()
+                train_loss_0 += loss_0.item()
+                train_loss_23 += loss_23.item()
+                train_loss_43 += loss_43.item()
+                train_loss_60 += loss_60.item()
 
-            train_cost = train_loss / len(trainloader)
-            tr_psnr = round(10 * math.log10(1.0 / train_cost), 3)
+            train_cost_0 = train_loss_0 / len(trainloader)
+            train_cost_23 = train_loss_23 / len(trainloader)
+            train_cost_43 = train_loss_43 / len(trainloader)
+            train_cost_60 = train_loss_60 / len(trainloader)
+
+            train_psnr_0 = round(10 * math.log10(1.0 / train_cost_0), 3)
+            train_psnr_23 = round(10 * math.log10(1.0 / train_cost_23), 3)
+            train_psnr_43 = round(10 * math.log10(1.0 / train_cost_43), 3)
+            train_psnr_60 = round(10 * math.log10(1.0 / train_cost_60), 3)
 
             # ========================================== Test ==========================================
-            test_loss = 0.0
+            test_loss_0 = 0.0
+            test_loss_23 = 0.0
+            test_loss_43 = 0.0
+            test_loss_60 = 0.0
 
             model.eval()
             with torch.no_grad():
@@ -274,28 +287,43 @@ def Transmission_train(trainloader, testloader, latent_dim):
                     reshaped_43 = data['reshaped_43']
                     reshaped_60 = data['reshaped_60']
 
-                    random_choice = random.choice([1, 2, 3, 4])
+                    inputs_0 = original_images.to(device)
+                    inputs_23 = reshaped_23.to(device)
+                    inputs_43 = reshaped_43.to(device)
+                    inputs_60 = reshaped_60.to(device)
 
-                    if random_choice == 1:
-                        inputs = original_images.to(device)
-                    elif random_choice == 2:
-                        inputs = reshaped_23.to(device)
-                    elif random_choice == 3:
-                        inputs = reshaped_43.to(device)
-                    elif random_choice == 4:
-                        inputs = reshaped_60.to(device)
+                    outputs_0 = model(inputs_0, SNRdB=params['SNR'][snr_i], channel=params['channel'])
+                    outputs_23 = model(inputs_23, SNRdB=params['SNR'][snr_i], channel=params['channel'])
+                    outputs_43 = model(inputs_43, SNRdB=params['SNR'][snr_i], channel=params['channel'])
+                    outputs_60 = model(inputs_60, SNRdB=params['SNR'][snr_i], channel=params['channel'])
 
-                    outputs = model(inputs, SNRdB=params['SNR'][snr_i], channel=params['channel'])
-                    loss = criterion(inputs, outputs)
-                    test_loss += loss.item()
+                    loss_0 = criterion(inputs_0, outputs_0)
+                    loss_23 = criterion(inputs_23, outputs_23)
+                    loss_43 = criterion(inputs_43, outputs_43)
+                    loss_60 = criterion(inputs_60, outputs_60)
 
-                test_cost = test_loss / len(testloader)
-                test_psnr = round(10 * math.log10(1.0 / test_cost), 3)
 
-            scheduler.step(test_cost)
 
-            if test_cost < min_test_cost:
-                min_test_cost = test_cost
+                    test_loss_0 += loss_0.item()
+                    test_loss_23 += loss_23.item()
+                    test_loss_43 += loss_43.item()
+                    test_loss_60 += loss_60.item()
+
+                test_cost_0 = test_loss_0 / len(testloader)
+                test_cost_23 = test_loss_23 / len(testloader)
+                test_cost_43 = test_loss_43 / len(testloader)
+                test_cost_60 = test_loss_60 / len(testloader)
+
+                test_psnr_0 = round(10 * math.log10(1.0 / test_cost_0), 3)
+                test_psnr_23 = round(10 * math.log10(1.0 / test_cost_23), 3)
+                test_psnr_43 = round(10 * math.log10(1.0 / test_cost_43), 3)
+                test_psnr_60 = round(10 * math.log10(1.0 / test_cost_60), 3)
+
+                total_test_loss = test_cost_0 + test_cost_23 + test_cost_43 + test_cost_60
+
+
+            if total_test_loss < min_test_cost:
+                min_test_cost = total_test_loss
                 epochs_no_improve = 0
             else:
                 epochs_no_improve += 1
@@ -303,19 +331,26 @@ def Transmission_train(trainloader, testloader, latent_dim):
                 print("Early stopping!")
                 break
 
+            scheduler.step(total_test_loss)
+
             training_time = time.time() - timetemp
 
-            print(
-                "[{:>3}-Epoch({:>5}sec.)]  PSNR(Train / Val) : {:>6.4f} / {:>6.4f}".format(epoch + 1, round(training_time, 2), tr_psnr, test_psnr))
+            Avg_train_psnr = (train_psnr_0 + train_psnr_23 + train_psnr_43 + train_psnr_60) / 4
+            Avg_test_psnr = (test_psnr_0 + test_psnr_23 + test_psnr_43 + test_psnr_60) / 4
 
-            if test_psnr > max_psnr:
+            print(
+                "[{:>3}-Epoch({:>5}sec.)] (Avg):{:>6.4f}/{:>6.4f}   (MR=0%):{:>6.4f}/{:>6.4f}   (MR=23%):{:>6.4f}/{:>6.4f}   (MR=43%):{:>6.4f}/{:>6.4f}   (MR=60%):{:>6.4f}/{:>6.4f}".format(
+                    epoch + 1, round(training_time, 2), Avg_train_psnr, Avg_test_psnr, train_psnr_0, test_psnr_0,
+                    train_psnr_23, test_psnr_23, train_psnr_43, test_psnr_43, train_psnr_60, test_psnr_60))
+
+            if Avg_test_psnr > max_psnr:
 
                 save_folder = 'trained_Transmission'
 
                 if not os.path.exists(save_folder):
                     os.makedirs(save_folder)
                 previous_psnr = max_psnr
-                max_psnr = test_psnr
+                max_psnr = Avg_test_psnr
 
                 # 이전 최고 성능 모델이 있다면 삭제
                 if previous_best_model_path is not None:
@@ -328,30 +363,3 @@ def Transmission_train(trainloader, testloader, latent_dim):
                 print(f"Saved new best model at {save_path}")
 
                 previous_best_model_path = save_path
-
-                # Performance.txt 파일 업데이트
-                with open(performance_file, 'r+') as f:
-                    lines = f.readlines()
-                    dim_str = f"DIM {latent_dim} :"
-                    updated = False
-
-                    # 기존 DIM에 대한 SNR 기록 업데이트
-                    for i, line in enumerate(lines):
-                        if line.startswith(dim_str):
-                            snr_values = line.split(':')[1].strip().strip('[]').split(',')
-                            while len(snr_values) < len(params['SNR']):
-                                snr_values.append('')
-                            snr_values[snr_i] = f" (SNR={params['SNR'][snr_i]}dB): {max_psnr}"
-                            lines[i] = f"{dim_str} [{', '.join(snr_values)}]\n"
-                            updated = True
-                            break
-
-                    # 새로운 DIM에 대한 기록 추가
-                    if not updated:
-                        snr_values = ['' for _ in params['SNR']]
-                        snr_values[snr_i] = f" (SNR={params['SNR'][snr_i]}dB): {max_psnr}"
-                        new_record = f"{dim_str} [{', '.join(snr_values)}]\n"
-                        lines.append(new_record)
-
-                    f.seek(0)
-                    f.writelines(lines)
