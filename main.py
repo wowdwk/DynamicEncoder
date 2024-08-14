@@ -1,3 +1,4 @@
+import os
 from utils import *
 from Selection import preprocess_and_save_dataset, Loader_maker_for_Transmission
 from InPainting import Loader_maker_for_InPainting
@@ -6,7 +7,7 @@ from PositionEst import Make_Data
 from InPainting import InPaint_train
 
 
-if __name__ == '__main__' :
+if __name__ == '__main__':
 
     ####################################### Selection Process at Tx #######################################
 
@@ -28,10 +29,11 @@ if __name__ == '__main__' :
 
     ####################################### Transmission process with Rayleigh channel #######################################
 
-    for dim_i in range(len(params['DIM'])) :
+    for dim_i in range(len(params['DIM'])):
 
-        transmission_model_path = "trained_Transmission"
-        if not os.path.exists(transmission_model_path) :
+        # 수정된 부분: DIM 값만으로 파일이 있는지 확인
+        transmission_model_dir = f"trained_Transmission/DynamicEncoder(DIM={params['DIM'][dim_i]})"
+        if not any(fname.startswith(f"DynamicEncoder(DIM={params['DIM'][dim_i]}_SNR=") for fname in os.listdir('trained_Transmission')):
             traindataset = Loader_maker_for_Transmission(root_dir=Processed_train_path)
             testdataset  = Loader_maker_for_Transmission(root_dir=Processed_test_path)
 
@@ -46,17 +48,19 @@ if __name__ == '__main__' :
         if not os.path.exists(masked_train_dir):
             Make_Data(params['DIM'][dim_i])
 
-    ####################################### Inpainting Process ar Rx #######################################
+    ####################################### Inpainting Process at Rx #######################################
 
-        for snr_i in range(len(params['SNR'])) :
+        inpaint_model_dir = f"inpaint_model/InPaint(DIM={params['DIM'][dim_i]})"
+        if not any(fname.startswith(f"InPaint(DIM={params['DIM'][dim_i]}_SNR=") for fname in os.listdir('inpaint_model')):
+            for snr_i in range(len(params['SNR'])):
 
-            Masked_train_path = f"Masked_Train/{params['DIM'][dim_i]}/{params['SNR'][snr_i]}"
-            Masked_test_path  = f"Masked_Test/{params['DIM'][dim_i]}/{params['SNR'][snr_i]}"
+                Masked_train_path = f"Masked_Train/{params['DIM'][dim_i]}/{params['SNR'][snr_i]}"
+                Masked_test_path  = f"Masked_Test/{params['DIM'][dim_i]}/{params['SNR'][snr_i]}"
 
-            traindataset = Loader_maker_for_InPainting(root_dir=Masked_train_path)
-            testdataset = Loader_maker_for_InPainting(root_dir=Masked_test_path)
+                traindataset = Loader_maker_for_InPainting(root_dir=Masked_train_path)
+                testdataset = Loader_maker_for_InPainting(root_dir=Masked_test_path)
 
-            trainloader = DataLoader(traindataset, batch_size=64, shuffle=True, num_workers=4, drop_last=True)
-            testloader  = DataLoader(testdataset, batch_size=64, shuffle=False, num_workers=4, drop_last=True)
+                trainloader = DataLoader(traindataset, batch_size=64, shuffle=True, num_workers=4, drop_last=True)
+                testloader  = DataLoader(testdataset, batch_size=64, shuffle=True, num_workers=4, drop_last=True)
 
-            InPaint_train(trainloader, testloader, params['DIM'][dim_i], params['SNR'][snr_i])
+                InPaint_train(trainloader, testloader, params['DIM'][dim_i], params['SNR'][snr_i])
