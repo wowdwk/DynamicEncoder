@@ -16,14 +16,14 @@ if __name__ == '__main__':
     if not os.path.exists(Processed_train_path):
         transform = transforms.Compose([transforms.ToTensor()])
         train_cifar10 = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform=transform)
-        preprocess_and_save_dataset(train_cifar10, Processed_train_path, patch_size=1,
-                                    mask_ratio=[0.234375, 0.4375, 0.609375],
+        preprocess_and_save_dataset(train_cifar10, Processed_train_path, patch_size=2,
+                                    mask_ratio=[0.33984, 0.609375, 0.75],
                                     importance_type='variance', how_many=1)
     if not os.path.exists(Processed_test_path):
         transform = transforms.Compose([transforms.ToTensor()])
         test_cifar10 = torchvision.datasets.CIFAR10(root='./data', train=False, download=True, transform=transform)
-        preprocess_and_save_dataset(test_cifar10, Processed_test_path, patch_size=1,
-                                    mask_ratio=[0.234375, 0.4375, 0.609375],
+        preprocess_and_save_dataset(test_cifar10, Processed_test_path, patch_size=2,
+                                    mask_ratio=[0.33984, 0.609375, 0.75],
                                     importance_type='variance', how_many=1)
 
     ####################################### Transmission process with Rayleigh channel #######################################

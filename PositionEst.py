@@ -1,6 +1,3 @@
-import os
-import torch
-from torch.utils.data import DataLoader
 from utils import *
 from Selection import Loader_maker_for_Transmission
 from Transmission import Autoencoder
@@ -50,37 +47,37 @@ def process_data_with_model(data_loader, model, SNR):
     processed_data = []
     for data in tqdm(data_loader):
         original_images = data['original_images'].to(device)
-        reshaped_23 = data['reshaped_23'].to(device)
-        reshaped_43 = data['reshaped_43'].to(device)
+        reshaped_33 = data['reshaped_33'].to(device)
         reshaped_60 = data['reshaped_60'].to(device)
-        index_23 = data['index_23']
-        index_43 = data['index_43']
+        reshaped_75 = data['reshaped_75'].to(device)
+        index_33 = data['index_33']
         index_60 = data['index_60']
+        index_75 = data['index_75']
         image_shape = original_images.shape
 
         with torch.no_grad():
             recon_0  = model(original_images, SNRdB=SNR, channel=params['channel'])
-            recon_23 = model(reshaped_23, SNRdB=SNR, channel=params['channel'])
-            recon_43 = model(reshaped_43, SNRdB=SNR, channel=params['channel'])
+            recon_33 = model(reshaped_33, SNRdB=SNR, channel=params['channel'])
             recon_60 = model(reshaped_60, SNRdB=SNR, channel=params['channel'])
+            recon_75 = model(reshaped_75, SNRdB=SNR, channel=params['channel'])
 
-        recon_masked_23 = reconstruct_image_from_patches(recon_23, index_23, image_shape, patch_size=1)
-        recon_masked_43 = reconstruct_image_from_patches(recon_43, index_43, image_shape, patch_size=1)
-        recon_masked_60 = reconstruct_image_from_patches(recon_60, index_60, image_shape, patch_size=1)
+        recon_masked_33 = reconstruct_image_from_patches(recon_33, index_33, image_shape, patch_size=2)
+        recon_masked_60 = reconstruct_image_from_patches(recon_60, index_60, image_shape, patch_size=2)
+        recon_masked_75 = reconstruct_image_from_patches(recon_75, index_75, image_shape, patch_size=2)
 
-        processed_data.append((original_images.cpu(), recon_0.cpu(), recon_masked_23.cpu(), recon_masked_43.cpu(), recon_masked_60.cpu()))
+        processed_data.append((original_images.cpu(), recon_0.cpu(), recon_masked_33.cpu(), recon_masked_60.cpu(), recon_masked_75.cpu()))
 
     return processed_data
 
 def save_processed_data(processed_data, save_dir):
     os.makedirs(save_dir, exist_ok=True)
-    for i, (original_images, recon_0, recon_masked_23, recon_masked_43, recon_masked_60) in enumerate(processed_data):
+    for i, (original_images, recon_0, recon_masked_33, recon_masked_60, recon_masked_75) in enumerate(processed_data):
         torch.save({
             'original_images': original_images,
             'recon_0'        : recon_0,
-            'recon_masked_23': recon_masked_23,
-            'recon_masked_43': recon_masked_43,
-            'recon_masked_60': recon_masked_60
+            'recon_masked_33': recon_masked_33,
+            'recon_masked_60': recon_masked_60,
+            'recon_masked_75': recon_masked_75
         }, os.path.join(save_dir, f'Data_{i}.pt'))
 
 def Make_Data(DIM):

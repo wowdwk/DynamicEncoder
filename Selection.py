@@ -1,5 +1,5 @@
 from utils import *
-def patch_importance(image, patch_size=2, type='variance', how_many=2):
+def patch_importance(image, patch_size=2, type='variance', how_many=1):
     if isinstance(image, torch.Tensor):
         image = image.numpy()
 
@@ -31,7 +31,7 @@ def patch_importance(image, patch_size=2, type='variance', how_many=2):
             value_map[i // patch_size, j // patch_size] = value
 
     return value_map
-def chessboard_mask(images, patch_size=1, mask_ratio=0.5, importance_type='variance', how_many=1):
+def chessboard_mask(images, patch_size=2, mask_ratio=0.5, importance_type='variance', how_many=1):
     for mr_i in range(len(mask_ratio)):
         MR = mask_ratio[mr_i]
         B, C, H, W = images.shape
@@ -94,19 +94,12 @@ def chessboard_mask(images, patch_size=1, mask_ratio=0.5, importance_type='varia
             unmasked_counts.append(unmasked_count)
             unmasked_patches_image = torch.cat(unmasked_patches, dim=-1)
 
-            if MR == 0.234375:
-                split_len = 28
+            if MR == 0.33984:
+                split_len = 26
                 split_tensor = torch.split(unmasked_patches_image, split_len, dim=2)
-                masked_23 = masked_images
-                reshaped_23 = torch.cat(split_tensor, dim=1)
-                index_23 = torch.tensor(patch_index)
-
-            elif MR == 0.4375:
-                split_len = 24
-                split_tensor = torch.split(unmasked_patches_image, split_len, dim=2)
-                masked_43 = masked_images
-                reshaped_43 = torch.cat(split_tensor, dim=1)
-                index_43 = torch.tensor(patch_index)
+                masked_33 = masked_images
+                reshaped_33 = torch.cat(split_tensor, dim=1)
+                index_33 = torch.tensor(patch_index)
 
             elif MR == 0.609375:
                 split_len = 20
@@ -115,26 +108,35 @@ def chessboard_mask(images, patch_size=1, mask_ratio=0.5, importance_type='varia
                 reshaped_60 = torch.cat(split_tensor, dim=1)
                 index_60 = torch.tensor(patch_index)
 
-    return masked_23, masked_43, masked_60, reshaped_23, reshaped_43, reshaped_60, index_23, index_43, index_60
+            elif MR == 0.75:
+                split_len = 16
+                split_tensor = torch.split(unmasked_patches_image, split_len, dim=2)
+                masked_75 = masked_images
+                reshaped_75 = torch.cat(split_tensor, dim=1)
+                index_75 = torch.tensor(patch_index)
+
+    return masked_33, masked_60, masked_75, reshaped_33, reshaped_60, reshaped_75, index_33, index_60, index_75
+
+
 def preprocess_and_save_dataset(dataset, root_dir, patch_size, mask_ratio, importance_type, how_many):
     os.makedirs(root_dir, exist_ok=True)
 
     for i, (images, _) in tqdm(enumerate(dataset), total=len(dataset)):
 
-        masked_23, masked_43, masked_60, reshaped_23, reshaped_43, reshaped_60, index_23,  index_43, index_60\
+        masked_33, masked_60, masked_75, reshaped_33, reshaped_60, reshaped_75, index_33,  index_60, index_75\
             = chessboard_mask(images.unsqueeze(0), patch_size, mask_ratio, importance_type, how_many)
 
         torch.save({
             'original_images': images,
-            'masked_images_23': masked_23.squeeze(0),
-            'masked_images_43': masked_43.squeeze(0),
+            'masked_images_33': masked_33.squeeze(0),
             'masked_images_60': masked_60.squeeze(0),
-            'reshaped_23': reshaped_23,
-            'reshaped_43': reshaped_43,
+            'masked_images_75': masked_75.squeeze(0),
+            'reshaped_33': reshaped_33,
             'reshaped_60': reshaped_60,
-            'index_23': index_23,
-            'index_43': index_43,
+            'reshaped_75': reshaped_75,
+            'index_33': index_33,
             'index_60': index_60,
+            'index_75': index_75,
         }, os.path.join(root_dir, f'data_{i}.pt'))
 
 
@@ -152,43 +154,44 @@ class Loader_maker_for_Transmission(Dataset):
         file_path = self.file_paths[idx]
         data = torch.load(file_path)
 
+
         original_images = data['original_images']
 
-        masked_images_23 = data['masked_images_23']
-        masked_images_43 = data['masked_images_43']
+        masked_images_33 = data['masked_images_33']
         masked_images_60 = data['masked_images_60']
+        masked_images_75 = data['masked_images_75']
 
-        reshaped_23 = data['reshaped_23']
-        reshaped_43 = data['reshaped_43']
+        reshaped_33 = data['reshaped_33']
         reshaped_60 = data['reshaped_60']
+        reshaped_75 = data['reshaped_75']
 
-        index_23 = data['index_23']
-        index_43 = data['index_43']
+        index_33 = data['index_33']
         index_60 = data['index_60']
+        index_75 = data['index_75']
 
         if self.transform:
             original_images = self.transform(original_images)
-            masked_images_23 = self.transform(masked_images_23)
-            masked_images_43 = self.transform(masked_images_43)
+            masked_images_33 = self.transform(masked_images_33)
             masked_images_60 = self.transform(masked_images_60)
+            masked_images_75 = self.transform(masked_images_75)
 
-            reshaped_23 = self.transform(reshaped_23)
-            reshaped_43 = self.transform(reshaped_43)
+            reshaped_33 = self.transform(reshaped_33)
             reshaped_60 = self.transform(reshaped_60)
+            reshaped_75 = self.transform(reshaped_75)
 
-            index_23 = self.transform(index_23)
-            index_43 = self.transform(index_43)
+            index_33 = self.transform(index_33)
             index_60 = self.transform(index_60)
+            index_75 = self.transform(index_75)
 
         return {
             'original_images': original_images,
-            'masked_images_23': masked_images_23,
-            'masked_images_43': masked_images_43,
+            'masked_images_33': masked_images_33,
             'masked_images_60': masked_images_60,
-            'reshaped_23': reshaped_23,
-            'reshaped_43': reshaped_43,
+            'masked_images_75': masked_images_75,
+            'reshaped_33': reshaped_33,
             'reshaped_60': reshaped_60,
-            'index_23': index_23,
-            'index_43': index_43,
-            'index_60': index_60
+            'reshaped_75': reshaped_75,
+            'index_33': index_33,
+            'index_60': index_60,
+            'index_75': index_75
         }

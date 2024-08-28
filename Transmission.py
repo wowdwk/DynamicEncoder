@@ -4,6 +4,8 @@ from params import *
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
+
+
 class Encoder(nn.Module):
     def __init__(self, latent_dim):
         super(Encoder, self).__init__()
@@ -28,12 +30,12 @@ class Encoder(nn.Module):
 
         self.essen = nn.Conv2d(32, 32, kernel_size=5, stride=2, padding=1)
 
-
     def forward(self, x):
 
         height = x.shape[-1]
 
-        if height == 32 :
+        if height == 32:
+            encoder_level = 1
             x = self.prelu(self.in1(x))
             x = self.prelu(self.out1(x))
             x = self.prelu(self.out2(x))
@@ -41,37 +43,41 @@ class Encoder(nn.Module):
             x = self.prelu(self.out4(x))
 
             x = self.prelu(self.essen(x))
-            #print(x.shape)
+            # print(x.shape)
 
-        if height == 28 : # Selection Ratio : 0.765625
+        if height == 26:  # Selection Ratio : 0.765625
+            encoder_level = 2
             x = self.prelu(self.in2(x))
             x = self.prelu(self.out2(x))
             x = self.prelu(self.out3(x))
             x = self.prelu(self.out4(x))
 
             x = self.prelu(self.essen(x))
-            #print(x.shape)
+            # print(x.shape)
 
-        if height == 24 : # Selectio Ratio : 0.5625
+        if height == 20:  # Selectio Ratio : 0.5625
+            encoder_level = 3
             x = self.prelu(self.in3(x))
             x = self.prelu(self.out3(x))
             x = self.prelu(self.out4(x))
             x = self.prelu(self.essen(x))
-            #print(x.shape)
+            # print(x.shape)
 
-        if height == 20 : # Selection Ratio : 0.390625
+        if height == 16:  # Selection Ratio : 0.390625
+            encoder_level = 4
             x = self.prelu(self.in4(x))
             x = self.prelu(self.out4(x))
             x = self.prelu(self.essen(x))
-            #print(x.shape)
+            # print(x.shape)
 
         x = self.pool(x)
-        #print(x.shape)
+
         x = self.flatten(x)
         encoded = self.linear(x)
-        encoder_level = int(((32-height)/4) + 1)
 
         return encoded, encoder_level
+
+
 class Decoder(nn.Module):
     def __init__(self, latent_dim):
         super(Decoder, self).__init__()
@@ -88,9 +94,9 @@ class Decoder(nn.Module):
         self.in2 = nn.ConvTranspose2d(32, 32, kernel_size=5, stride=1, padding=1)
         self.in1 = nn.ConvTranspose2d(32, 32, kernel_size=5, stride=1, padding=0)
 
-        self.out4 = nn.ConvTranspose2d(32, 3, kernel_size=5, stride=1, padding=2)
-        self.out3 = nn.ConvTranspose2d(32, 3, kernel_size=5, stride=1, padding=1)
-        self.out2 = nn.ConvTranspose2d(32, 3, kernel_size=5, stride=1, padding=0)
+        self.out4 = nn.ConvTranspose2d(32, 3, kernel_size=5, stride=1, padding=4)
+        self.out3 = nn.ConvTranspose2d(32, 3, kernel_size=5, stride=1, padding=3)
+        self.out2 = nn.ConvTranspose2d(32, 3, kernel_size=5, stride=1, padding=1)
         self.out1 = nn.ConvTranspose2d(32, 3, kernel_size=5, stride=1, padding=0)
 
         self.sigmoid = nn.Sigmoid()
@@ -209,13 +215,13 @@ def Transmission_train(trainloader, testloader, latent_dim):
         print("Model size : {}".format(count_parameters(model)))
         criterion = nn.MSELoss()
         optimizer = optim.Adam(model.parameters(), lr=params['LR'])
-        scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=20, verbose=True)
+        scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.3, patience=10, verbose=True)
 
         min_test_cost = float('inf')
         epochs_no_improve = 0
         n_epochs_stop = params['ES']
 
-        print("+++++ SNR = {} Training Start! +++++\t".format(params['SNR'][snr_i]))
+        print("+++++ Transmission(SNR = {}) Training Start! +++++\t".format(params['SNR'][snr_i]))
 
         max_psnr = 0
         previous_best_model_path = None
@@ -224,9 +230,9 @@ def Transmission_train(trainloader, testloader, latent_dim):
 
             # ========================================== Train ==========================================
             train_loss_0 = 0.0
-            train_loss_23 = 0.0
-            train_loss_43 = 0.0
+            train_loss_33 = 0.0
             train_loss_60 = 0.0
+            train_loss_75 = 0.0
 
             model.train()
             timetemp = time.time()
@@ -234,93 +240,90 @@ def Transmission_train(trainloader, testloader, latent_dim):
             for data in trainloader:
 
                 original_images = data['original_images']
-                reshaped_23 = data['reshaped_23']
-                reshaped_43 = data['reshaped_43']
+                reshaped_33 = data['reshaped_33']
                 reshaped_60 = data['reshaped_60']
+                reshaped_75 = data['reshaped_75']
 
                 inputs_0 = original_images.to(device)
-                inputs_23 = reshaped_23.to(device)
-                inputs_43 = reshaped_43.to(device)
+                inputs_33 = reshaped_33.to(device)
                 inputs_60 = reshaped_60.to(device)
+                inputs_75 = reshaped_75.to(device)
 
                 optimizer.zero_grad()
                 outputs_0 = model(inputs_0, SNRdB=params['SNR'][snr_i], channel=params['channel'])
-                outputs_23 = model(inputs_23, SNRdB=params['SNR'][snr_i], channel=params['channel'])
-                outputs_43 = model(inputs_43, SNRdB=params['SNR'][snr_i], channel=params['channel'])
+                outputs_33 = model(inputs_33, SNRdB=params['SNR'][snr_i], channel=params['channel'])
                 outputs_60 = model(inputs_60, SNRdB=params['SNR'][snr_i], channel=params['channel'])
+                outputs_75 = model(inputs_75, SNRdB=params['SNR'][snr_i], channel=params['channel'])
 
                 loss_0 = criterion(inputs_0, outputs_0)
-                loss_23 = criterion(inputs_23, outputs_23)
-                loss_43 = criterion(inputs_43, outputs_43)
+                loss_33 = criterion(inputs_33, outputs_33)
                 loss_60 = criterion(inputs_60, outputs_60)
+                loss_75 = criterion(inputs_75, outputs_75)
 
-                loss = loss_0 + 0.9 * loss_23 + 0.6 * loss_43 + 0.4 * loss_60
+                loss = loss_0 + loss_33 + loss_60 + loss_75
 
                 loss.backward()
                 optimizer.step()
                 train_loss_0 += loss_0.item()
-                train_loss_23 += loss_23.item()
-                train_loss_43 += loss_43.item()
+                train_loss_33 += loss_33.item()
                 train_loss_60 += loss_60.item()
+                train_loss_75 += loss_75.item()
 
             train_cost_0 = train_loss_0 / len(trainloader)
-            train_cost_23 = train_loss_23 / len(trainloader)
-            train_cost_43 = train_loss_43 / len(trainloader)
+            train_cost_33 = train_loss_33 / len(trainloader)
             train_cost_60 = train_loss_60 / len(trainloader)
+            train_cost_75 = train_loss_75 / len(trainloader)
 
             train_psnr_0 = round(10 * math.log10(1.0 / train_cost_0), 3)
-            train_psnr_23 = round(10 * math.log10(1.0 / train_cost_23), 3)
-            train_psnr_43 = round(10 * math.log10(1.0 / train_cost_43), 3)
+            train_psnr_33 = round(10 * math.log10(1.0 / train_cost_33), 3)
             train_psnr_60 = round(10 * math.log10(1.0 / train_cost_60), 3)
+            train_psnr_75 = round(10 * math.log10(1.0 / train_cost_75), 3)
 
             # ========================================== Test ==========================================
             test_loss_0 = 0.0
-            test_loss_23 = 0.0
-            test_loss_43 = 0.0
+            test_loss_33 = 0.0
             test_loss_60 = 0.0
+            test_loss_75 = 0.0
 
             model.eval()
             with torch.no_grad():
                 for data in testloader:
                     original_images = data['original_images']
-                    reshaped_23 = data['reshaped_23']
-                    reshaped_43 = data['reshaped_43']
+                    reshaped_33 = data['reshaped_33']
                     reshaped_60 = data['reshaped_60']
+                    reshaped_75 = data['reshaped_75']
 
                     inputs_0 = original_images.to(device)
-                    inputs_23 = reshaped_23.to(device)
-                    inputs_43 = reshaped_43.to(device)
+                    inputs_33 = reshaped_33.to(device)
                     inputs_60 = reshaped_60.to(device)
+                    inputs_75 = reshaped_75.to(device)
 
                     outputs_0 = model(inputs_0, SNRdB=params['SNR'][snr_i], channel=params['channel'])
-                    outputs_23 = model(inputs_23, SNRdB=params['SNR'][snr_i], channel=params['channel'])
-                    outputs_43 = model(inputs_43, SNRdB=params['SNR'][snr_i], channel=params['channel'])
+                    outputs_33 = model(inputs_33, SNRdB=params['SNR'][snr_i], channel=params['channel'])
                     outputs_60 = model(inputs_60, SNRdB=params['SNR'][snr_i], channel=params['channel'])
+                    outputs_75 = model(inputs_75, SNRdB=params['SNR'][snr_i], channel=params['channel'])
 
                     loss_0 = criterion(inputs_0, outputs_0)
-                    loss_23 = criterion(inputs_23, outputs_23)
-                    loss_43 = criterion(inputs_43, outputs_43)
+                    loss_33 = criterion(inputs_33, outputs_33)
                     loss_60 = criterion(inputs_60, outputs_60)
-
-
+                    loss_75 = criterion(inputs_75, outputs_75)
 
                     test_loss_0 += loss_0.item()
-                    test_loss_23 += loss_23.item()
-                    test_loss_43 += loss_43.item()
+                    test_loss_33 += loss_33.item()
                     test_loss_60 += loss_60.item()
+                    test_loss_75 += loss_75.item()
 
                 test_cost_0 = test_loss_0 / len(testloader)
-                test_cost_23 = test_loss_23 / len(testloader)
-                test_cost_43 = test_loss_43 / len(testloader)
+                test_cost_33 = test_loss_33 / len(testloader)
                 test_cost_60 = test_loss_60 / len(testloader)
+                test_cost_75 = test_loss_75 / len(testloader)
 
                 test_psnr_0 = round(10 * math.log10(1.0 / test_cost_0), 3)
-                test_psnr_23 = round(10 * math.log10(1.0 / test_cost_23), 3)
-                test_psnr_43 = round(10 * math.log10(1.0 / test_cost_43), 3)
+                test_psnr_33 = round(10 * math.log10(1.0 / test_cost_33), 3)
                 test_psnr_60 = round(10 * math.log10(1.0 / test_cost_60), 3)
+                test_psnr_75 = round(10 * math.log10(1.0 / test_cost_75), 3)
 
-                total_test_loss = test_cost_0 + test_cost_23 + test_cost_43 + test_cost_60
-
+                total_test_loss = test_cost_0 + test_cost_33 + test_cost_60 + test_cost_75
 
             if total_test_loss < min_test_cost:
                 min_test_cost = total_test_loss
@@ -335,13 +338,13 @@ def Transmission_train(trainloader, testloader, latent_dim):
 
             training_time = time.time() - timetemp
 
-            Avg_train_psnr = (train_psnr_0 + train_psnr_23 + train_psnr_43 + train_psnr_60) / 4
-            Avg_test_psnr = (test_psnr_0 + test_psnr_23 + test_psnr_43 + test_psnr_60) / 4
+            Avg_train_psnr = (train_psnr_0 + train_psnr_33 + train_psnr_60 + train_psnr_75) / 4
+            Avg_test_psnr = (test_psnr_0 + test_psnr_33 + test_psnr_60 + test_psnr_75) / 4
 
             print(
-                "[{:>3}-Epoch({:>5}sec.)] (Avg):{:>6.4f}/{:>6.4f}   (MR=0%):{:>6.4f}/{:>6.4f}   (MR=23%):{:>6.4f}/{:>6.4f}   (MR=43%):{:>6.4f}/{:>6.4f}   (MR=60%):{:>6.4f}/{:>6.4f}".format(
+                "[{:>3}-Epoch({:>5}sec.)] (Avg):{:>6.4f}/{:>6.4f}   (MR=0%):{:>6.4f}/{:>6.4f}   (MR=33%):{:>6.4f}/{:>6.4f}   (MR=60%):{:>6.4f}/{:>6.4f}   (MR=75%):{:>6.4f}/{:>6.4f}".format(
                     epoch + 1, round(training_time, 2), Avg_train_psnr, Avg_test_psnr, train_psnr_0, test_psnr_0,
-                    train_psnr_23, test_psnr_23, train_psnr_43, test_psnr_43, train_psnr_60, test_psnr_60))
+                    train_psnr_33, test_psnr_33, train_psnr_60, test_psnr_60, train_psnr_75, test_psnr_75))
 
             if Avg_test_psnr > max_psnr:
 
@@ -363,3 +366,9 @@ def Transmission_train(trainloader, testloader, latent_dim):
                 print(f"Saved new best model at {save_path}")
 
                 previous_best_model_path = save_path
+
+        with open('Transmission_peformance.txt', 'a', encoding='utf-8') as file:
+
+            file.write(f"\nDIM:{latent_dim}")
+            file.write(f"\nSNR({params['SNR'][snr_i]}dB) : (Avg):{max_psnr}   (Ori.):{test_psnr_0}   (MR=33%):{test_psnr_33}   (MR=65%):{test_psnr_60}   (MR=75%):{test_psnr_75}")
+
